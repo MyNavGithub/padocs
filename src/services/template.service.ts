@@ -1,245 +1,248 @@
-import {
-    collection, doc, addDoc, updateDoc, deleteDoc,
-    getDoc, getDocs, query, where, deleteField,
-} from 'firebase/firestore'
-import { db } from './firebase'
-
-// ── Types ─────────────────────────────────────────────────────────────────
-
-export interface TemplateField {
-    key: string
-    label: string
-}
+import PizZip from 'pizzip'
+import Docxtemplater from 'docxtemplater'
+import ImageModule from 'docxtemplater-image-module-free'
+import { supabase } from './supabase'
 
 export interface Template {
     id?: string
     schoolId: string
     name: string
-    description: string
-    content: string          // HTML/text with {{placeholder}} tokens
-    fields: TemplateField[]  // auto-detected from content
-    pdfReferenceUrl?: string // Firebase Storage URL for reference PDF
-    createdBy: string
-    createdAt: Date
-    updatedAt: Date
-    isActive: boolean
+    description?: string
+    content: ArrayBuffer
+    contentHtml?: string        // persisted HTML from the rich-text editor
+    contentStorageUrl?: string
+    fields: string[]
+    createdBy?: string
+    createdAt?: any
+    updatedAt?: any
+    pdfReferenceUrl?: string
+    isActive?: boolean
+    margins?: { top: number; bottom: number; left: number; right: number }
 }
 
-// ── Utilities ─────────────────────────────────────────────────────────────
+export function renderContent(templateBuffer: ArrayBuffer, data: Record<string, string>): Blob {
+    const zip = new PizZip(templateBuffer, { base64: false })
 
-/**
- * Scans template content for {{placeholder}} tokens AND image-placeholder nodes
- * and returns a deduplicated list of TemplateField objects with auto-generated labels.
- */
-export function extractFields(content: string = ''): TemplateField[] {
-    const fields: TemplateField[] = []
-    const seen = new Set<string>()
-
-    const addField = (key: string) => {
-        if (!seen.has(key)) {
-            seen.add(key)
-            fields.push({
-                key,
-                label: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-            })
-        }
-    }
-
-    // Hand-coded {{text}} placeholders
-    let match: RegExpExecArray | null
-    const regex = /\{\{([^}]+)\}\}/g
-    while ((match = regex.exec(content || '')) !== null) addField(match[1].trim())
-
-    // Image placeholder nodes via DOM Parsing
-    try {
-        const parser = new DOMParser()
-        const doc = parser.parseFromString(content || '', 'text/html')
-        const imgNodes = doc.querySelectorAll('[data-type="image-placeholder"]')
-        imgNodes.forEach(node => {
-            const k = node.getAttribute('data-field-key')
-            if (k) addField(k)
-        })
-    } catch (e) {
-        console.warn('DOM parser not available for extractFields')
-    }
-
-    return fields
-}
-
-/**
- * Fills {{placeholder}} tokens in content with values from data map.
- * Also replaces <span data-type="image-placeholder"> with actual <img>.
- * Unknown tokens are left as [key] for visibility.
- */
-export function renderContent(content: string = '', data: Record<string, string>): string {
-    let result = (content || '').replace(/\{\{([^}]+)\}\}/g, (_, key) => {
-        const k = key.trim()
-        return data[k] ?? `[${k}]`
+    const imageModule = new ImageModule({
+        centered: false,
+        fileType: 'docx',
+        getImage: (tagValue: string) => {
+            const base64 = tagValue.replace(/^data:image\/\w+;base64,/, '')
+            const binary = atob(base64)
+            const bytes = new Uint8Array(binary.length)
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+            return bytes
+        },
+        getSize: () => [150, 150],
     })
 
-    try {
-        const parser = new DOMParser()
-        const doc = parser.parseFromString(result, 'text/html')
-        const imgNodes = doc.querySelectorAll('[data-type="image-placeholder"]')
+    const docx = new Docxtemplater(zip, {
+        modules: [imageModule],
+        paragraphLoop: true,
+        linebreaks: true,
+    })
+    docx.render(data)
 
-        imgNodes.forEach(node => {
-            const k = node.getAttribute('data-field-key')
-            const w = node.getAttribute('data-width') || '150'
-            const h = node.getAttribute('data-height') || '150'
-            const x = node.getAttribute('data-x')
-            const y = node.getAttribute('data-y')
-            if (!k) return
-
-            const imgSrc = data[k]
-            const isFloating = x !== null && y !== null
-
-            if (imgSrc && (imgSrc.startsWith('http') || imgSrc.startsWith('data:'))) {
-                const img = doc.createElement('img')
-                img.src = imgSrc
-                img.style.width = `${w}px`
-                img.style.height = `${h}px`
-                img.style.objectFit = 'cover'
-                img.style.display = 'block'
-
-                if (isFloating) {
-                    // Wrap in absolute-positioned container (matches editor position)
-                    const wrapper = doc.createElement('div')
-                    wrapper.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;`
-                    wrapper.appendChild(img)
-                    node.replaceWith(wrapper)
-                } else {
-                    img.style.maxWidth = '100%'
-                    node.replaceWith(img)
-                }
-            } else {
-                // Placeholder box: show label + grey fill if image not provided
-                const div = doc.createElement('div')
-                const baseStyle = `width:${w}px;height:${h}px;background:#f3f4f6;border:2px dashed #d1d5db;color:#9ca3af;display:inline-flex;align-items:center;justify-content:center;font-family:monospace;font-size:12px;box-sizing:border-box;`
-                if (isFloating) {
-                    div.style.cssText = `position:absolute;left:${x}px;top:${y}px;` + baseStyle
-                } else {
-                    div.style.cssText = baseStyle
-                }
-                div.textContent = `Image: ${k}`
-                node.replaceWith(div)
-            }
-        })
-        return doc.body.innerHTML
-    } catch (e) {
-        return result
-    }
-}
-
-
-// ── CRUD ──────────────────────────────────────────────────────────────────
-
-
-/** Strips undefined values — Firestore rejects undefined fields */
-function sanitize(data: Record<string, unknown>): Record<string, unknown> {
-    const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(data)) {
-        out[k] = v === undefined ? deleteField() : v
-    }
+    const out = docx.getZip().generate({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })
     return out
 }
 
-export async function createTemplate(
-    data: Omit<Template, 'id'>,
-): Promise<string> {
-    try {
-        // Build Firestore-safe payload — no undefined values
-        const payload: Record<string, unknown> = {
-            schoolId: data.schoolId,
-            name: data.name,
-            description: data.description,
-            content: data.content,
-            fields: data.fields,
-            createdBy: data.createdBy,
-            isActive: data.isActive ?? true,
-            createdAt: data.createdAt ?? new Date(),
-            updatedAt: new Date(),
-        }
-        if (data.pdfReferenceUrl) payload.pdfReferenceUrl = data.pdfReferenceUrl
-        const ref = await addDoc(collection(db, 'templates'), payload)
-        console.log('[TemplateService] Created template:', ref.id)
-        return ref.id
-    } catch (err) {
-        console.error('[TemplateService] createTemplate failed:', err)
-        throw err
-    }
-}
-
-export async function updateTemplate(
-    id: string,
-    data: Partial<Omit<Template, 'id'>>,
-): Promise<void> {
-    try {
-        // Build Firestore-safe payload — replace undefined with deleteField()
-        const base: Record<string, unknown> = {
-            name: data.name,
-            description: data.description,
-            content: data.content,
-            fields: data.fields,
-            schoolId: data.schoolId,
-            createdBy: data.createdBy,
-            updatedAt: new Date(),
-        }
-        // Optional field: only set if we have a value, remove from Firestore if null/undefined
-        base.pdfReferenceUrl = data.pdfReferenceUrl ? data.pdfReferenceUrl : deleteField()
-
-        // Remove keys from the base that were not provided in 'data'
-        const payload = sanitize(Object.fromEntries(
-            Object.entries(base).filter(([k]) => k === 'updatedAt' || k === 'pdfReferenceUrl' || k in data)
-        ))
-
-        await updateDoc(doc(db, 'templates', id), payload)
-        console.log('[TemplateService] Updated template:', id)
-    } catch (err) {
-        console.error('[TemplateService] updateTemplate failed:', err)
-        throw err
-    }
-}
-
-/** Soft-delete: sets isActive=false */
-export async function archiveTemplate(id: string): Promise<void> {
-    await updateDoc(doc(db, 'templates', id), {
-        isActive: false,
-        updatedAt: new Date(),
+export function renderHtmlContent(html: string, data: Record<string, string>): string {
+    return html.replace(/\{([^{}]+)\}/g, (match, field) => {
+        const key = field.trim()
+        return data[key] !== undefined ? data[key] : match
     })
 }
 
-/** Hard-delete: permanently removes the template document */
-export async function deleteTemplate(id: string): Promise<void> {
-    await deleteDoc(doc(db, 'templates', id))
-    console.log('[TemplateService] Deleted template:', id)
+export function readDocxFile(file: File): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as ArrayBuffer)
+        reader.onerror = reject
+        reader.readAsArrayBuffer(file)
+    })
+}
+
+export function extractFields(input: ArrayBuffer | string): string[] {
+    const matches = new Set<string>()
+    const regex = /\{([^{}]+)\}/g
+
+    if (typeof input === 'string') {
+        let match
+        while ((match = regex.exec(input)) !== null) {
+            matches.add(match[1].trim())
+        }
+    } else {
+        const zip = new PizZip(input)
+        const docx = new Docxtemplater(zip, {
+            paragraphLoop: true,
+            linebreaks: true,
+        })
+        const text = docx.getFullText()
+        let match
+        while ((match = regex.exec(text)) !== null) {
+            matches.add(match[1].trim())
+        }
+    }
+    return Array.from(matches)
+}
+
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    bytes.forEach(b => binary += String.fromCharCode(b))
+    return btoa(binary)
+}
+
+export function base64ToArrayBuffer(base64: string): ArrayBuffer {
+    const binary = atob(base64)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    return bytes.buffer
+}
+
+// ── Helpers: upload/download .docx binary via Supabase Storage ──────────
+
+async function uploadTemplateDocx(schoolId: string, templateId: string, buffer: ArrayBuffer): Promise<string> {
+    const filePath = `schools/${schoolId}/${templateId}.docx`
+    const { error } = await supabase.storage
+        .from('templates')
+        .upload(filePath, buffer, {
+            contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            upsert: true
+        })
+
+    if (error) throw error
+
+    const { data } = supabase.storage.from('templates').getPublicUrl(filePath)
+    return data.publicUrl
+}
+
+async function downloadTemplateDocx(schoolId: string, templateId: string): Promise<ArrayBuffer> {
+    const filePath = `schools/${schoolId}/${templateId}.docx`
+    const { data, error } = await supabase.storage.from('templates').download(filePath)
+    if (error) throw error
+    return await data.arrayBuffer()
+}
+
+// ── Template CRUD ──────────────────────────────────────────────────────
+
+export async function getSchoolTemplates(schoolId: string): Promise<Template[]> {
+    const { data, error } = await supabase
+        .from('templates')
+        .select('*')
+        .eq('school_id', schoolId)
+
+    if (error) throw error
+
+    const templates: Template[] = []
+    for (const d of data) {
+        let content: ArrayBuffer = new ArrayBuffer(0)
+        try {
+            content = await downloadTemplateDocx(d.school_id, d.id)
+        } catch { /* empty */ }
+
+        templates.push({
+            id: d.id,
+            schoolId: d.school_id,
+            name: d.name,
+            fields: d.fields,
+            pdfReferenceUrl: d.pdf_reference_url,
+            isActive: d.is_active,
+            createdAt: d.created_at,
+            contentHtml: d.content_html ?? undefined,
+            content
+        } as Template)
+    }
+    return templates
 }
 
 export async function getTemplate(id: string): Promise<Template | null> {
-    const snap = await getDoc(doc(db, 'templates', id))
-    if (!snap.exists()) return null
-    return { id: snap.id, ...snap.data() } as Template
+    const { data, error } = await supabase
+        .from('templates')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+    if (error || !data) return null
+
+    let content: ArrayBuffer = new ArrayBuffer(0)
+    try {
+        content = await downloadTemplateDocx(data.school_id, data.id)
+    } catch { /* empty */ }
+
+    return {
+        id: data.id,
+        schoolId: data.school_id,
+        name: data.name,
+        fields: data.fields,
+        pdfReferenceUrl: data.pdf_reference_url,
+        isActive: data.is_active,
+        createdAt: data.created_at,
+        contentHtml: data.content_html ?? undefined,
+        content
+    } as Template
 }
 
-export async function getSchoolTemplates(schoolId: string): Promise<Template[]> {
-    try {
-        // Single-field query — no composite index needed
-        // isActive filter + date sort done client-side
-        const snap = await getDocs(
-            query(
-                collection(db, 'templates'),
-                where('schoolId', '==', schoolId),
-            ),
-        )
-        return snap.docs
-            .map((d) => ({ id: d.id, ...d.data() } as Template))
-            .filter((t) => t.isActive !== false)
-            .sort((a, b) => {
-                const aTime = (a.createdAt as unknown as { seconds?: number })?.seconds ?? 0
-                const bTime = (b.createdAt as unknown as { seconds?: number })?.seconds ?? 0
-                return bTime - aTime
-            })
-    } catch (err) {
-        console.error('[TemplateService] getSchoolTemplates failed:', err)
-        throw err
+export async function createTemplate(templateData: Omit<Template, 'id'>): Promise<string> {
+    const { content, ...dbData } = templateData
+
+    const record: any = {
+        school_id: dbData.schoolId,
+        name: dbData.name,
+        fields: dbData.fields,
+        pdf_reference_url: dbData.pdfReferenceUrl,
+        is_active: dbData.isActive !== false,
+        content_html: dbData.contentHtml
     }
+
+    const { data: inserted, error } = await supabase
+        .from('templates')
+        .insert(record)
+        .select()
+        .single()
+
+    if (error) throw error
+
+    if (content && content.byteLength > 0) {
+        await uploadTemplateDocx(inserted.school_id, inserted.id, content)
+    }
+
+    return inserted.id
+}
+
+export async function updateTemplate(id: string, templateData: Partial<Template>): Promise<void> {
+    const { content, ...dbData } = templateData
+
+    const record: any = {}
+    if (dbData.name !== undefined) record.name = dbData.name
+    if (dbData.fields !== undefined) record.fields = dbData.fields
+    if (dbData.pdfReferenceUrl !== undefined) record.pdf_reference_url = dbData.pdfReferenceUrl
+    if (dbData.isActive !== undefined) record.is_active = dbData.isActive
+    if (dbData.contentHtml !== undefined) record.content_html = dbData.contentHtml
+
+    if (Object.keys(record).length > 0) {
+        const { error } = await supabase
+            .from('templates')
+            .update(record)
+            .eq('id', id)
+
+        if (error) throw error
+    }
+
+    if (content && content.byteLength > 0 && dbData.schoolId) {
+        await uploadTemplateDocx(dbData.schoolId, id, content)
+    }
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+    const { error } = await supabase
+        .from('templates')
+        .delete()
+        .eq('id', id)
+
+    if (error) throw error
 }

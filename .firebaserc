@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "studio-1439003984-f12e5"
-  }
+    "default": "padocs-vit-2026"
+  },
+  "targets": {},
+  "etags": {}
 }

@@ -756,6 +756,7 @@ function buildListHtml(items: ListItem[]): string {
 
 export interface DocxConvertResult {
     html: string
+    margins?: { top: number; bottom: number; left: number; right: number }
     warnings: string[]
 }
 
@@ -850,7 +851,23 @@ export async function convertDocxToHtml(buffer: ArrayBuffer): Promise<DocxConver
     }
 
     flushList()
-
     const html = htmlParts.join('\n')
-    return { html, warnings }
+
+    // Extract page margins
+    let pageMargins = undefined
+    const sectPr = kid(body, 'sectPr')
+    if (sectPr) {
+        const pgMar = kid(sectPr, 'pgMar')
+        if (pgMar) {
+            const twToMm = (tw: string | null) => tw ? Math.round(parseInt(tw, 10) / 1440 * 25.4) : 0
+            pageMargins = {
+                top: twToMm(attr(pgMar, 'top')),
+                bottom: twToMm(attr(pgMar, 'bottom')),
+                left: twToMm(attr(pgMar, 'left')),
+                right: twToMm(attr(pgMar, 'right')),
+            }
+        }
+    }
+
+    return { html, margins: pageMargins, warnings }
 }

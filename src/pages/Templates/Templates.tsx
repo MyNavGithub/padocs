@@ -51,21 +51,19 @@ function TemplatePreviewModal({ tpl, onClose }: { tpl: Template; onClose: () => 
                 {tpl.fields.length > 0 && (
                     <div className="px-6 py-3 border-b border-gray-50 dark:border-slate-800 bg-indigo-50/50 dark:bg-indigo-900/10 flex flex-wrap gap-1.5">
                         {tpl.fields.map(f => (
-                            <span key={f.key}
+                            <span key={f}
                                 className="inline-flex items-center gap-1 text-xs font-mono text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 px-2 py-0.5 rounded-full">
-                                {`{{${f.key}}}`}
+                                {`{${f}}`}
                             </span>
                         ))}
                     </div>
                 )}
 
-                {/* Content preview */}
-                <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-slate-950 p-6">
-                    <div className="max-w-[680px] mx-auto bg-white dark:bg-slate-900 shadow rounded-lg p-8">
-                        <div
-                            className="padocs-editor"
-                            dangerouslySetInnerHTML={{ __html: tpl.content }}
-                        />
+                <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-slate-950 p-6 flex items-center justify-center">
+                    <div className="max-w-[680px] w-full bg-white dark:bg-slate-900 shadow rounded-lg p-12 text-center">
+                        <FileText size={48} className="text-gray-200 dark:text-slate-800 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-700 dark:text-slate-300 mb-2">{t('templates.docxTemplate')}</h3>
+                        <p className="text-sm text-gray-400">{t('templates.previewNotSupported')}</p>
                     </div>
                 </div>
 

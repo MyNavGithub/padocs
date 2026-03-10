@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { Settings, Building2, CreditCard, Shield, Check, Loader2, AlertCircle } from 'lucide-react'
 import { useAuth } from '../../app/AuthContext'
 import { useTranslation } from 'react-i18next'
-import { doc, updateDoc } from 'firebase/firestore'
-import { db } from '../../services/firebase'
+import { supabase } from '../../services/supabase'
 import { PLANS, getPlan } from '../../services/billing.service'
 
 export default function SettingsPage() {
@@ -22,7 +21,12 @@ export default function SettingsPage() {
         if (!schoolId || !editName.trim()) return
         setSaving(true); setError(null)
         try {
-            await updateDoc(doc(db, 'schools', schoolId), { name: editName.trim() })
+            const { error: updateError } = await supabase
+                .from('schools')
+                .update({ name: editName.trim() })
+                .eq('id', schoolId)
+
+            if (updateError) throw updateError
             setSaved(true)
             setTimeout(() => setSaved(false), 3000)
         } catch { setError(t('settings.saveFailed')) }
@@ -72,7 +76,7 @@ export default function SettingsPage() {
                             className="btn-primary gap-2 text-sm">
                             {saving ? <><Loader2 size={14} className="animate-spin" /> {t('settings.saving')}</>
                                 : saved ? <><Check size={14} /> {t('settings.saved')}</>
-                                : t('settings.save')}
+                                    : t('settings.save')}
                         </button>
                     )}
                 </div>

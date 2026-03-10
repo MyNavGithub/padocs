@@ -1,23 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
-import { Users, Upload, CheckCircle, AlertCircle, Clock, RefreshCw, Loader2 } from 'lucide-react'
+import { Users, Upload, CheckCircle, AlertCircle, Clock, RefreshCw, Loader2, Link as LinkIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../app/AuthContext'
 import {
     uploadApprovedTeachers,
     validateAndInviteTeacher,
 } from '../../services/teacher.service'
-import {
-    getDocs, query, collection, where,
-} from 'firebase/firestore'
-import { db } from '../../services/firebase'
+import { supabase } from '../../services/supabase'
 import type { ApprovedTeacher } from '../../services/teacher.service'
 
 type Tab = 'upload' | 'approved' | 'active'
 
 function StatusBadge({ status, t }: { status: ApprovedTeacher['status']; t: (k: string) => string }) {
     const map = {
-        unused:    { key: 'teachers.status.unused',    cls: 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300' },
-        invited:   { key: 'teachers.status.invited',   cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+        unused: { key: 'teachers.status.unused', cls: 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300' },
+        invited: { key: 'teachers.status.invited', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
         activated: { key: 'teachers.status.activated', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
     }
     const { key, cls } = map[status]
@@ -28,6 +25,7 @@ export default function Teachers() {
     const { schoolId, schoolName, role } = useAuth()
     const { t } = useTranslation()
     const [tab, setTab] = useState<Tab>('upload')
+    const [copied, setCopied] = useState(false)
 
     const [emailInput, setEmailInput] = useState('')
     const [uploading, setUploading] = useState(false)
@@ -45,10 +43,22 @@ export default function Teachers() {
         if (!schoolId) return
         setLoadingApproved(true)
         try {
-            const snap = await getDocs(
-                query(collection(db, 'approvedTeachers'), where('schoolId', '==', schoolId))
-            )
-            setApproved(snap.docs.map(d => ({ id: d.id, ...d.data() } as ApprovedTeacher & { id: string })))
+            const { data, error } = await supabase
+                .from('approved_teachers')
+                .select('*')
+                .eq('school_id', schoolId)
+
+            if (!error && data) {
+                setApproved(data.map(d => ({
+                    id: d.id,
+                    schoolId: d.school_id,
+                    email: d.email,
+                    status: d.status,
+                    inviteToken: d.invite_token,
+                    inviteExpiresAt: d.invite_expires_at ? new Date(d.invite_expires_at) : null,
+                    uploadedAt: new Date(d.uploaded_at)
+                })))
+            }
         } catch (e) {
             console.error(e)
         } finally {
@@ -88,13 +98,32 @@ export default function Teachers() {
         if (!schoolId || !schoolName || !teacher.email) return
         setResending(teacher.email)
         try {
-            await validateAndInviteTeacher(teacher.email, schoolId, schoolName)
+            const token = await validateAndInviteTeacher(teacher.email, schoolId, schoolName)
+
+            // WORKAROUND: Send email directly via the user's native email client (Zero Backend / Free)
+            const activationUrl = `${window.location.origin}/teacher-activate?token=${token}`
+            const subject = encodeURIComponent(`Invitation à rejoindre ${schoolName} sur PADocs`)
+            const body = encodeURIComponent(
+                `Bonjour,\n\nVous avez été invité(e) en tant que professeur à ${schoolName} sur la plateforme PADocs.\n\n` +
+                `Veuillez cliquer sur le lien ci-dessous pour activer votre compte :\n${activationUrl}\n\n` +
+                `Le lien expire dans 72 heures.\n\n` +
+                `Si vous n'attendiez pas d'invitation, vous pouvez simplement ignorer cet e-mail.\n\nCordialement,\nL'équipe PADocs`
+            )
+            window.location.href = `mailto:${teacher.email}?subject=${subject}&body=${body}`
+
             await fetchApproved()
         } catch (e) {
             console.error('Resend failed:', e)
         } finally {
             setResending(null)
         }
+    }
+
+    const handleCopyGenericLink = () => {
+        const genericUrl = `${window.location.origin}/join?school=${schoolId}`
+        navigator.clipboard.writeText(genericUrl)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 3000)
     }
 
     if (!isAdmin) {
@@ -109,13 +138,31 @@ export default function Teachers() {
     return (
         <div className="p-6 max-w-5xl mx-auto">
             {/* Header */}
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <Users size={24} className="text-indigo-600" /> {t('teachers.title')}
-                </h1>
-                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                    {t('teachers.subtitle')}
-                </p>
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <Users size={24} className="text-indigo-600" /> {t('teachers.title')}
+                    </h1>
+                    <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                        {t('teachers.subtitle')}
+                    </p>
+                </div>
+
+                <div className="flex gap-2 items-center">
+                    <span className="text-xs text-gray-400 hidden sm:inline-block">
+                        {t('teachers.bulkShareHint', 'Envoyer via Whatsapp ou Slack :')}
+                    </span>
+                    <button
+                        onClick={handleCopyGenericLink}
+                        className="btn-secondary gap-2 text-sm bg-white dark:bg-slate-800"
+                    >
+                        {copied ? (
+                            <><CheckCircle size={16} className="text-emerald-500" /> {t('teachers.copied', "Copié !")}</>
+                        ) : (
+                            <><LinkIcon size={16} className="text-indigo-500" /> {t('teachers.copyGenericLink', "Copier le lien d'invitation de l'école")}</>
+                        )}
+                    </button>
+                </div>
             </div>
 
             {/* Tabs */}
@@ -229,7 +276,7 @@ export default function Teachers() {
                                             <td className="px-4 py-3 font-mono text-xs text-gray-700 dark:text-slate-300">{teacher.email}</td>
                                             <td className="px-4 py-3"><StatusBadge status={teacher.status} t={t} /></td>
                                             <td className="px-4 py-3 text-xs text-gray-400">
-                                                {teacher.uploadedAt ? new Date((teacher.uploadedAt as unknown as { seconds: number }).seconds * 1000).toLocaleDateString() : '—'}
+                                                {teacher.uploadedAt ? teacher.uploadedAt.toLocaleDateString() : '—'}
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 {teacher.status === 'unused' && (

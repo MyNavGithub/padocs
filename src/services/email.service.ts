@@ -12,8 +12,7 @@
  * ✅ Fully auditable (every email attempt is recorded)
  */
 
-import { collection, addDoc } from 'firebase/firestore'
-import { db } from './firebase'
+// import { supabase } from './supabase'
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -35,21 +34,23 @@ export interface QueuedEmail {
 async function queueEmail(
     to: string,
     template: EmailTemplate,
-    data: Record<string, string | number | boolean>,
+    _data: Record<string, string | number | boolean>,
 ): Promise<void> {
-    const email: QueuedEmail = {
-        to,
-        template,
-        data,
-        createdAt: new Date(),
-        status: 'pending',
-    }
-
     try {
+        // [MANUAL WORKAROUND]
+        // Firebase Cloud Functions require a Blaze subscription (billing account).
+        // Since no backend infrastructure is available and frontend API calls are insecure,
+        // we are shifting to Option 4 (Manual Notification). 
+        // 
+        // The original logic queued an email in the Firestore 'mailQueue' collection.
+        // Uncomment the code below if migrating back to a Cloud Functions/Backend infrastructure.
+        /*
         await addDoc(collection(db, 'mailQueue'), email)
         console.log('[EmailService] Queued email:', template, 'to:', to)
+        */
+        console.log('[EmailService] Automated emailing disabled (Manual Workaround Active). Skipping template:', template, 'to:', to)
     } catch (err) {
-        console.error('[EmailService] Failed to queue email:', err)
+        console.error('[EmailService] Failed:', err)
         throw err
     }
 }

@@ -10,6 +10,7 @@ import Documents from '../pages/Documents/Documents'
 import Settings from '../pages/Settings/Settings'
 import Teachers from '../pages/Teachers/Teachers'
 import TeacherActivate from '../pages/TeacherActivate/TeacherActivate'
+import JoinSchool from '../pages/JoinSchool/JoinSchool'
 
 export default function AppRoutes() {
     return (
@@ -22,6 +23,9 @@ export default function AppRoutes() {
             {/* Teacher activation — public (token is the authorization) */}
             <Route path="/teacher-activate" element={<TeacherActivate />} />
 
+            {/* Generic Join School — option 3 workplace flow */}
+            <Route path="/join" element={<JoinSchool />} />
+
             {/* Protected routes — must be authenticated */}
             <Route
                 element={
@@ -30,12 +34,12 @@ export default function AppRoutes() {
                     </ProtectedRoute>
                 }
             >
-                <Route path="/dashboard"  element={<Dashboard />} />
-                <Route path="/templates"  element={<Templates />} />
-                <Route path="/editor"     element={<Editor />} />
-                <Route path="/documents"  element={<Documents />} />
-                <Route path="/settings"   element={<Settings />} />
-                <Route path="/teachers"   element={<Teachers />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/templates" element={<Templates />} />
+                <Route path="/editor" element={<Editor />} />
+                <Route path="/documents" element={<Documents />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/teachers" element={<Teachers />} />
             </Route>
 
             {/* Fallback */}

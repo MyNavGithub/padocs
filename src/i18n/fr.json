@@ -68,7 +68,9 @@
     "viewTitle": "Aperçu du modèle",
     "previewNote": "L'aperçu affiche le contenu du modèle avec les jetons de remplacement visibles.",
     "fieldsLabel": "champs",
-    "hoverToAct": "Survoler pour Modifier / Voir"
+    "hoverToAct": "Survoler pour Modifier / Voir",
+    "docxTemplate": "Modèle DOCX",
+    "previewNotSupported": "L'aperçu riche n'est pas pris en charge pour les modèles .docx binaires. Générez un document pour voir le résultat final."
   },
   "editor": {
     "untitled": "Modèle sans titre",
@@ -100,10 +102,7 @@
     "docxTypeError": "Veuillez télécharger un fichier .docx.",
     "pdfTypeError": "Veuillez télécharger un fichier .pdf.",
     "pdfUploadError": "Échec du téléchargement du PDF. Veuillez réessayer.",
-    "editorHint": "Utilisez le bouton Insérer un champ ou tapez {{example}} directement dans le document",
     "adminOnly": "Accès administrateur requis pour modifier les modèles.",
-    "fields": "Champs",
-    "noFields": "Aucun champ pour l'instant",
     "uploadPdf": "Joindre une référence PDF",
     "uploading": "Téléchargement...",
     "viewReference": "Voir la référence PDF",
@@ -147,7 +146,10 @@
     "saving": "Enregistrement...",
     "editLoadFailed": "Échec du chargement du document pour modification.",
     "templateNotFound": "Modèle introuvable. Il a peut-être été supprimé.",
+    "noHtmlVersion": "Ce modèle n'a pas de version HTML. Veuillez modifier et enregistrer le modèle manuellement une fois pour activer l'impression PDF.",
     "updateFailed": "Échec de la mise à jour. Veuillez réessayer.",
+    "printFailed": "Échec de la génération du PDF. Veuillez réessayer.",
+    "downloadFailed": "Échec du téléchargement du document. Veuillez réessayer.",
     "deleteDocument": "Supprimer le document ?",
     "deleteDocumentDesc": "Cette action est irréversible.",
     "documents": "{{count}} document(s) généré(s)",

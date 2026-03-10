@@ -5,8 +5,8 @@ import {
     useState,
     type ReactNode,
 } from 'react'
-import { onAuthStateChanged, type User } from 'firebase/auth'
-import { auth } from '../services/firebase'
+import { type User } from '@supabase/supabase-js'
+import { supabase } from '../services/supabase'
 import {
     fetchUserSchoolAndRole,
     type UserRole,
@@ -17,46 +17,44 @@ import {
 // ============ TYPES ============
 
 interface AuthContextValue {
-    user:          User | null
-    schoolId:      string | null
-    role:          UserRole | null
-    schoolName:    string | null
-    plan:          PlanType | null
+    user: User | null
+    schoolId: string | null
+    role: UserRole | null
+    schoolName: string | null
+    plan: PlanType | null
     billingStatus: BillingStatus | null
-    loading:       boolean
+    loading: boolean
 }
 
 // ============ CONTEXT ============
 
 const AuthContext = createContext<AuthContextValue>({
-    user:          null,
-    schoolId:      null,
-    role:          null,
-    schoolName:    null,
-    plan:          null,
+    user: null,
+    schoolId: null,
+    role: null,
+    schoolName: null,
+    plan: null,
     billingStatus: null,
-    loading:       true,
+    loading: true,
 })
 
 // ============ PROVIDER ============
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user,          setUser]          = useState<User | null>(null)
-    const [schoolId,      setSchoolId]      = useState<string | null>(null)
-    const [role,          setRole]          = useState<UserRole | null>(null)
-    const [schoolName,    setSchoolName]    = useState<string | null>(null)
-    const [plan,          setPlan]          = useState<PlanType | null>(null)
+    const [user, setUser] = useState<User | null>(null)
+    const [schoolId, setSchoolId] = useState<string | null>(null)
+    const [role, setRole] = useState<UserRole | null>(null)
+    const [schoolName, setSchoolName] = useState<string | null>(null)
+    const [plan, setPlan] = useState<PlanType | null>(null)
     const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null)
-    const [loading,       setLoading]       = useState(true)
+    const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-            if (firebaseUser) {
-                console.log('[AuthContext] User signed in:', firebaseUser.uid)
+        const handleUserChange = async (supabaseUser: User | null) => {
+            if (supabaseUser) {
+                console.log('[AuthContext] User signed in:', supabaseUser.id)
                 try {
-                    // Fetch users/{uid} → schoolId → schools/{schoolId}
-                    // All before setUser so Header always renders with full data
-                    const info = await fetchUserSchoolAndRole(firebaseUser.uid)
+                    const info = await fetchUserSchoolAndRole(supabaseUser.id)
                     console.log('[AuthContext] School info fetched:', info)
 
                     if (info) {
@@ -66,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         setPlan(info.plan)
                         setBillingStatus(info.billingStatus)
                     } else {
-                        console.warn('[AuthContext] No school found for uid:', firebaseUser.uid)
+                        console.warn('[AuthContext] No school found for id:', supabaseUser.id)
                         setSchoolId(null)
                         setRole(null)
                         setSchoolName(null)
@@ -81,8 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setPlan(null)
                     setBillingStatus(null)
                 } finally {
-                    // Set user only after all school data is ready
-                    setUser(firebaseUser)
+                    setUser(supabaseUser)
                     setLoading(false)
                 }
             } else {
@@ -95,9 +92,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setBillingStatus(null)
                 setLoading(false)
             }
+        }
+
+        // 1. Get initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            handleUserChange(session?.user || null)
         })
 
-        return unsubscribe
+        // 2. Listen to state changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            (_event, session) => {
+                handleUserChange(session?.user || null)
+            }
+        )
+
+        return () => {
+            subscription.unsubscribe()
+        }
     }, [])
 
     return (

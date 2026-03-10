@@ -1,16 +1,5 @@
-import {
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
-    signOut,
-    type User,
-} from 'firebase/auth'
-import {
-    doc,
-    setDoc,
-    getDoc,
-    collection,
-} from 'firebase/firestore'
-import { auth, db } from './firebase'
+import { type User } from '@supabase/supabase-js'
+import { supabase } from './supabase'
 
 // ============ TYPES ============
 
@@ -18,43 +7,35 @@ export type UserRole = 'admin' | 'teacher'
 export type BillingStatus = 'inactive' | 'active' | 'past_due' | 'cancelled'
 export type PlanType = 'free' | 'starter' | 'pro' | 'enterprise'
 
-/** Top-level users/{uid} document */
 export interface UserProfile {
-    schoolId: string
-    role: UserRole
-    createdAt: Date
-}
-
-/** schools/{schoolId} document */
-export interface SchoolRecord {
-    name: string
-    createdAt: Date
-    plan: PlanType
-    billingStatus: BillingStatus
-    subscriptionEndDate: Date | null
-}
-
-/** schools/{schoolId}/users/{userId} subcollection document */
-export interface SchoolUserRecord {
-    uid: string
+    id: string
+    school_id: string
     email: string
     role: UserRole
-    createdAt: Date
-    isActive: boolean
+    is_active: boolean
+    created_at: string
 }
 
-/** Payment-agnostic payment record — supports Paystack, Flutterwave, etc. */
+export interface SchoolRecord {
+    id: string
+    name: string
+    created_at: string
+    plan: PlanType
+    billing_status: BillingStatus
+    subscription_end_date: string | null
+}
+
 export interface PaymentRecord {
-    schoolId: string
+    id: string
+    school_id: string
     amount: number
     currency: string
     status: 'pending' | 'success' | 'failed'
-    provider: string       // e.g. 'paystack', 'flutterwave', 'manual'
-    transactionRef: string
-    createdAt: Date
+    provider: string
+    transaction_ref: string
+    created_at: string
 }
 
-/** Returned from fetchUserSchoolAndRole */
 export interface UserSchoolInfo {
     schoolId: string
     role: UserRole
@@ -65,69 +46,48 @@ export interface UserSchoolInfo {
 
 // ============ REGISTRATION ============
 
-/**
- * Registers a new school admin with proper multi-tenant structure:
- *
- * 1. Create Firebase Auth user
- * 2. Generate random schoolId via Firestore auto-ID
- * 3. Create schools/{schoolId}  — with billing fields
- * 4. Create schools/{schoolId}/users/{uid}  — school subcollection
- * 5. Create users/{uid}  — top-level profile (used for fast auth lookups + rules)
- *
- * schoolId is now INDEPENDENT of uid — supports multiple admins per school.
- */
 export async function registerSchoolAdmin(
     schoolName: string,
     email: string,
     password: string,
 ): Promise<{ user: User; schoolId: string }> {
     try {
-        // 1. Create Firebase Auth user
         console.log('[registerSchoolAdmin] Creating auth user...')
-        const credential = await createUserWithEmailAndPassword(auth, email, password)
-        const { uid } = credential.user
-        console.log('[registerSchoolAdmin] Auth user created:', uid)
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+            email,
+            password,
+        })
+        if (authError) throw authError
+        if (!authData.user) throw new Error('No user returned from signup')
 
-        // 2. Generate random schoolId (NOT tied to uid)
-        const schoolRef = doc(collection(db, 'schools'))
-        const schoolId = schoolRef.id
-        console.log('[registerSchoolAdmin] Generated schoolId:', schoolId)
+        const user = authData.user
+        console.log('[registerSchoolAdmin] Auth user created:', user.id)
 
-        // 3. Create school document
-        const schoolData: SchoolRecord = {
-            name: schoolName.trim(),
-            createdAt: new Date(),
-            plan: 'free',
-            billingStatus: 'inactive',
-            subscriptionEndDate: null,
-        }
-        console.log('[registerSchoolAdmin] Writing schools/{schoolId}:', schoolData)
-        await setDoc(schoolRef, schoolData)
-        console.log('[registerSchoolAdmin] schools/{schoolId} written ✓')
+        // Create school document
+        const { data: school, error: schoolError } = await supabase
+            .from('schools')
+            .insert({ name: schoolName.trim() })
+            .select()
+            .single()
 
-        // 4. Create schools/{schoolId}/users/{uid} subcollection
-        const schoolUserData: SchoolUserRecord = {
-            uid,
-            email: email.toLowerCase().trim(),
-            role: 'admin',
-            createdAt: new Date(),
-            isActive: true,
-        }
-        console.log('[registerSchoolAdmin] Writing schools/{schoolId}/users/{uid}:', schoolUserData)
-        await setDoc(doc(db, 'schools', schoolId, 'users', uid), schoolUserData)
-        console.log('[registerSchoolAdmin] schools/{schoolId}/users/{uid} written ✓')
+        if (schoolError) throw schoolError
+        console.log('[registerSchoolAdmin] School created:', school.id)
 
-        // 5. Create top-level users/{uid} — used by AuthContext + security rules
-        const userProfileData: UserProfile = {
-            schoolId,
-            role: 'admin',
-            createdAt: new Date(),
-        }
-        console.log('[registerSchoolAdmin] Writing users/{uid}:', userProfileData)
-        await setDoc(doc(db, 'users', uid), userProfileData)
-        console.log('[registerSchoolAdmin] users/{uid} written ✓')
+        // Create user profile document matching auth user ID
+        const { error: profileError } = await supabase
+            .from('users')
+            .insert({
+                id: user.id,
+                school_id: school.id,
+                email: email.toLowerCase().trim(),
+                role: 'admin',
+                is_active: true
+            })
 
-        return { user: credential.user, schoolId }
+        if (profileError) throw profileError
+        console.log('[registerSchoolAdmin] User profile created ✓')
+
+        return { user, schoolId: school.id }
     } catch (err) {
         console.error('[registerSchoolAdmin] FAILED:', err)
         throw err
@@ -137,59 +97,70 @@ export async function registerSchoolAdmin(
 // ============ LOGIN ============
 
 export async function loginUser(email: string, password: string): Promise<User> {
-    const credential = await signInWithEmailAndPassword(auth, email, password)
-    return credential.user
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+    if (!data.user) throw new Error('Login failed')
+    return data.user
 }
 
 // ============ LOGOUT ============
 
 export async function logoutUser(): Promise<void> {
-    await signOut(auth)
+    const { error } = await supabase.auth.signOut()
+    if (error) throw error
 }
 
 // ============ FETCH USER SCHOOL INFO ============
 
-/**
- * Multi-tenant lookup:
- * 1. Fetch users/{uid}  → get schoolId + role
- * 2. Fetch schools/{schoolId}  → get name + plan + billingStatus
- *
- * This supports multiple admins per school and future teacher accounts
- * because schoolId is stored in the top-level users doc, not derived from uid.
- */
 export async function fetchUserSchoolAndRole(uid: string): Promise<UserSchoolInfo | null> {
     try {
         console.log('[fetchUserSchoolAndRole] Fetching users/', uid)
 
-        // Step 1: Get the user's profile to find their schoolId
-        const userSnap = await getDoc(doc(db, 'users', uid))
+        let userProfile = null
+        let profileError = null
 
-        if (!userSnap.exists()) {
-            console.warn('[fetchUserSchoolAndRole] No users/{uid} document found for:', uid)
+        // Race condition mitigation: when signUp is called, onAuthStateChange fires 
+        // before the custom profile record is actually saved. Let's retry up to 5 times (2.5 seconds max).
+        for (let attempt = 1; attempt <= 5; attempt++) {
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', uid)
+                .single()
+
+            if (data) {
+                userProfile = data
+                profileError = null
+                break
+            } else {
+                profileError = error
+                // wait 500ms before retrying
+                await new Promise(resolve => setTimeout(resolve, 500))
+            }
+        }
+
+        if (profileError || !userProfile) {
+            console.warn('[fetchUserSchoolAndRole] No users row found for:', uid)
             return null
         }
 
-        const userProfile = userSnap.data() as UserProfile
-        const { schoolId, role } = userProfile
-        console.log('[fetchUserSchoolAndRole] Found schoolId:', schoolId, 'role:', role)
+        const { data: schoolData, error: schoolError } = await supabase
+            .from('schools')
+            .select('*')
+            .eq('id', userProfile.school_id)
+            .single()
 
-        // Step 2: Get the school document for name + billing info
-        const schoolSnap = await getDoc(doc(db, 'schools', schoolId))
-
-        if (!schoolSnap.exists()) {
-            console.warn('[fetchUserSchoolAndRole] No schools/{schoolId} found for:', schoolId)
+        if (schoolError || !schoolData) {
+            console.warn('[fetchUserSchoolAndRole] No school row found for:', userProfile.school_id)
             return null
         }
-
-        const schoolData = schoolSnap.data() as SchoolRecord
-        console.log('[fetchUserSchoolAndRole] School found:', schoolData.name)
 
         return {
-            schoolId,
-            role,
+            schoolId: schoolData.id,
+            role: userProfile.role,
             schoolName: schoolData.name,
-            plan: schoolData.plan,
-            billingStatus: schoolData.billingStatus,
+            plan: schoolData.plan as PlanType,
+            billingStatus: schoolData.billing_status as BillingStatus,
         }
     } catch (err) {
         console.error('[fetchUserSchoolAndRole] Error:', err)

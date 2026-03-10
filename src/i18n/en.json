@@ -72,7 +72,9 @@
     "viewTitle": "Preview template",
     "previewNote": "Preview shows rendered template content with placeholder tokens visible.",
     "fieldsLabel": "fields",
-    "hoverToAct": "Hover to Edit / View"
+    "hoverToAct": "Hover to Edit / View",
+    "docxTemplate": "DOCX Template",
+    "previewNotSupported": "Rich preview is not supported for binary .docx templates. Generate a document to see the final result."
   },
   "editor": {
     "untitled": "Untitled Template",
@@ -104,10 +106,7 @@
     "docxTypeError": "Please upload a .docx file.",
     "pdfTypeError": "Please upload a .pdf file.",
     "pdfUploadError": "PDF upload failed. Please try again.",
-    "editorHint": "Use the Insert Field button or type {{example}} directly in the document",
     "adminOnly": "Admin access required to edit templates.",
-    "fields": "Fields",
-    "noFields": "No placeholder fields yet",
     "uploadPdf": "Attach PDF Reference",
     "uploading": "Uploading...",
     "viewReference": "View PDF reference",
@@ -151,7 +150,10 @@
     "saving": "Saving...",
     "editLoadFailed": "Failed to load document for editing.",
     "templateNotFound": "Template not found. It may have been deleted.",
+    "noHtmlVersion": "This template has no HTML version. Please edit and save the template manually once to enable PDF printing.",
     "updateFailed": "Update failed. Please try again.",
+    "printFailed": "Failed to generate PDF. Please try again.",
+    "downloadFailed": "Failed to download document. Please try again.",
     "deleteDocument": "Delete document?",
     "deleteDocumentDesc": "This action cannot be undone.",
     "documents_one": "{{count}} document generated",

@@ -1,97 +1,18 @@
-rules_version = '2';
+rules_version='2'
+
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isAuth() {
-      return request.auth != null;
+    match /{document=**} {
+      // This rule allows anyone with your database reference to view, edit,
+      // and delete all data in your database. It is useful for getting
+      // started, but it is configured to expire after 30 days because it
+      // leaves your app open to attackers. At that time, all client
+      // requests to your database will be denied.
+      //
+      // Make sure to write security rules for your app before that time, or
+      // else all client requests to your database will be denied until you
+      // update your rules.
+      allow read, write: if request.time < timestamp.date(2026, 4, 7);
     }
-    function callerProfile() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-    function callerSchoolId() {
-      return callerProfile().schoolId;
-    }
-    function callerRole() {
-      return callerProfile().role;
-    }
-    function isAdmin() {
-      return isAuth() && callerRole() == 'admin';
-    }
-    function belongsToSchool(schoolId) {
-      return isAuth() && callerSchoolId() == schoolId;
-    }
-
-    // users/{userId}
-    match /users/{userId} {
-      allow read:   if isAuth() && request.auth.uid == userId;
-      allow create: if isAuth() && request.auth.uid == userId;
-      allow update: if isAuth() && request.auth.uid == userId;
-      allow delete: if false;
-    }
-
-    // schools/{schoolId}
-    match /schools/{schoolId} {
-      allow read:   if belongsToSchool(schoolId);
-      allow create: if isAuth();
-      allow update: if belongsToSchool(schoolId) && isAdmin();
-      allow delete: if false;
-
-      match /users/{userId} {
-        allow read:   if belongsToSchool(schoolId);
-        allow create: if isAuth() && request.auth.uid == userId;
-        allow update: if belongsToSchool(schoolId) && (isAdmin() || request.auth.uid == userId);
-        allow delete: if belongsToSchool(schoolId) && isAdmin();
-      }
-    }
-
-    // templates/{templateId}
-    match /templates/{templateId} {
-      allow read:   if isAuth() && resource.data.schoolId == callerSchoolId();
-      allow create: if isAdmin() && request.resource.data.schoolId == callerSchoolId();
-      allow update: if isAdmin() && resource.data.schoolId == callerSchoolId();
-      allow delete: if isAdmin() && resource.data.schoolId == callerSchoolId();
-    }
-
-    // documents/{documentId}
-    match /documents/{documentId} {
-      allow read:   if isAuth() && resource.data.schoolId == callerSchoolId();
-      allow create: if isAuth() && request.resource.data.schoolId == callerSchoolId();
-      allow update: if isAdmin() && resource.data.schoolId == callerSchoolId();
-      allow delete: if isAdmin() && resource.data.schoolId == callerSchoolId();
-    }
-
-    // approvedTeachers/{docId}
-    match /approvedTeachers/{docId} {
-      allow read:   if isAdmin() && resource.data.schoolId == callerSchoolId();
-      allow create: if isAdmin() && request.resource.data.schoolId == callerSchoolId() && request.resource.data.status == 'unused';
-      allow update: if (isAdmin() && resource.data.schoolId == callerSchoolId()) ||
-                       (isAuth() && resource.data.email == request.auth.token.email);
-      allow delete: if false;
-    }
-
-    // inviteTokens/{token} — public read (token IS the authorization)
-    match /inviteTokens/{token} {
-      allow read:   if true;
-      allow create: if isAdmin() && request.resource.data.schoolId == callerSchoolId();
-      allow update: if false;
-      allow delete: if isAdmin() && resource.data.schoolId == callerSchoolId();
-    }
-
-    // payments/{paymentId}
-    match /payments/{paymentId} {
-      allow read:   if isAuth() && resource.data.schoolId == callerSchoolId();
-      allow create: if isAuth() && request.resource.data.schoolId == callerSchoolId();
-      allow update: if isAdmin() && resource.data.schoolId == callerSchoolId();
-      allow delete: if false;
-    }
-
-    // mailQueue/{docId} — create-only from client
-    match /mailQueue/{docId} {
-      allow create: if isAuth();
-      allow read:   if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
   }
 }

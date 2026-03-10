@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { FileText, FolderOpen, Users, Plus, Printer, X, ChevronRight, Loader2, AlertCircle } from 'lucide-react'
 import { useAuth } from '../../app/AuthContext'
 import { getSchoolTemplates, type Template } from '../../services/template.service'
-import { getSchoolDocuments, generateDocument, printDocument, type GeneratedDocument } from '../../services/document.service'
+import { getSchoolDocuments, generateDocument, downloadDocument, type GeneratedDocument } from '../../services/document.service'
 import { useTranslation } from 'react-i18next'
-import { getDocs, query, collection, where } from 'firebase/firestore'
-import { db } from '../../services/firebase'
+import { supabase } from '../../services/supabase'
 
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number | string; color: string }) {
     return (
@@ -53,12 +52,17 @@ export default function Dashboard() {
                 setTemplates(tmpl)
                 setDocuments(docs)
 
-                // Teachers count — subcollection query, handle separately
+                // Teachers count
                 try {
-                    const teacherSnap = await getDocs(
-                        query(collection(db, 'schools', schoolId, 'users'), where('role', '==', 'teacher'))
-                    )
-                    setTeacherCount(teacherSnap.size)
+                    const { count, error } = await supabase
+                        .from('users')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('school_id', schoolId)
+                        .eq('role', 'teacher')
+
+                    if (!error && count !== null) {
+                        setTeacherCount(count)
+                    }
                 } catch (e) {
                     console.error('Teacher count fetch failed:', e)
                 }
@@ -72,23 +76,23 @@ export default function Dashboard() {
     const openGenerateModal = (tpl: Template) => {
         setSelectedTemplate(tpl)
         setDocTitle('')
-        setFieldValues(Object.fromEntries(tpl.fields.map(f => [f.key, ''])))
+        setFieldValues(Object.fromEntries(tpl.fields.map(f => [f, ''])))
         setGenError(null)
         setShowModal(true)
     }
 
     const handleGenerate = async () => {
         if (!selectedTemplate || !schoolId || !user) return
-        const empty = selectedTemplate.fields.find(f => !fieldValues[f.key]?.trim())
-        if (empty) { setGenError(t('documents.fillRequired', { field: empty.label })); return }
+        const empty = selectedTemplate.fields.find(f => !fieldValues[f]?.trim())
+        if (empty) { setGenError(t('documents.fillRequired', { field: empty })); return }
         setGenerating(true); setGenError(null)
         try {
-            const { htmlContent } = await generateDocument(selectedTemplate, fieldValues, user.uid, docTitle || selectedTemplate.name)
+            const { docxBlob } = await generateDocument(selectedTemplate, fieldValues, user.id, docTitle || selectedTemplate.name)
             setShowModal(false)
             // Refresh docs
             getSchoolDocuments(schoolId).then(setDocuments)
-            // Auto print
-            printDocument(htmlContent, docTitle || selectedTemplate.name)
+            // Auto download
+            downloadDocument(docxBlob, docTitle || selectedTemplate.name)
         } catch (e) {
             setGenError(t('documents.generationFailed'))
             console.error(e)
@@ -170,7 +174,7 @@ export default function Dashboard() {
                                                 <p className="text-xs font-medium text-gray-700 dark:text-slate-300 truncate max-w-[180px]">{doc.title}</p>
                                                 <p className="text-xs text-gray-400">{doc.templateName}</p>
                                             </div>
-                                            <button onClick={() => printDocument(doc.htmlContent, doc.title)} className="icon-btn" title="Print">
+                                            <button onClick={() => { /* regenerate or download if URL? */ }} className="icon-btn" title="Download" disabled>
                                                 <Printer size={13} />
                                             </button>
                                         </div>
@@ -227,12 +231,12 @@ export default function Dashboard() {
                             </div>
 
                             {selectedTemplate.fields.map(field => (
-                                <div key={field.key}>
-                                    <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">{field.label}</label>
+                                <div key={field}>
+                                    <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">{field}</label>
                                     <input className="input text-sm"
-                                        placeholder={`${field.label.toLowerCase()}`}
-                                        value={fieldValues[field.key] ?? ''}
-                                        onChange={e => setFieldValues(v => ({ ...v, [field.key]: e.target.value }))} />
+                                        placeholder={`${field.toLowerCase()}`}
+                                        value={fieldValues[field] ?? ''}
+                                        onChange={e => setFieldValues(v => ({ ...v, [field]: e.target.value }))} />
                                 </div>
                             ))}
 

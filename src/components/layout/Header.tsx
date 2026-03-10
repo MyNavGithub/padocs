@@ -5,7 +5,7 @@ import { useTheme } from '../../hooks/useTheme'
 import { useAuth } from '../../app/AuthContext'
 import { logoutUser } from '../../services/auth.service'
 import {
-    Bell, Sun, Moon, Globe, Menu,
+    Sun, Moon, Globe, Menu,
     LogOut, User, ChevronDown, Building2,
 } from 'lucide-react'
 import type { Language } from '../../types'
@@ -15,13 +15,14 @@ interface HeaderProps {
     isSidebarCollapsed: boolean
 }
 
-function getInitials(user: { email: string | null; displayName: string | null } | null): string {
+function getInitials(user: { email?: string; user_metadata?: { full_name?: string } } | null | any): string {
     if (!user) return 'U'
-    if (user.displayName) {
-        return user.displayName
+    const name = user.user_metadata?.full_name || user.displayName
+    if (name) {
+        return name
             .split(' ')
             .slice(0, 2)
-            .map(n => n[0])
+            .map((n: string) => n[0])
             .join('')
             .toUpperCase()
     }
@@ -36,14 +37,13 @@ export default function Header({ onMenuClick, isSidebarCollapsed }: HeaderProps)
 
     const [userMenuOpen, setUserMenuOpen] = useState(false)
     const [loggingOut, setLoggingOut] = useState(false)
-    const [notifCount] = useState(3)
     const userMenuRef = useRef<HTMLDivElement>(null)
 
     const currentLang: Language = (i18n.language?.slice(0, 2) ?? 'fr') as Language
     const otherLang: Language = currentLang === 'fr' ? 'en' : 'fr'
     const initials = getInitials(user ?? null)
     const displayEmail = user?.email ?? ''
-    const displayName = user?.displayName ?? displayEmail.split('@')[0]
+    const displayName = (user as any)?.user_metadata?.full_name || (user as any)?.displayName || displayEmail.split('@')[0]
 
     // Translate role label
     const roleLabel = role === 'admin' ? t('dashboard.roleAdmin') : t('dashboard.roleTeacher')
@@ -139,22 +139,6 @@ export default function Header({ onMenuClick, isSidebarCollapsed }: HeaderProps)
                     {isDark ? <Sun size={17} /> : <Moon size={17} />}
                 </button>
 
-                {/* Notifications */}
-                <button
-                    className="icon-btn h-8 w-8 relative"
-                    aria-label={t('header.notifications')}
-                    title={t('header.notifications')}
-                >
-                    <Bell size={17} />
-                    {notifCount > 0 && (
-                        <span
-                            className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center"
-                        >
-                            {notifCount}
-                        </span>
-                    )}
-                </button>
-
                 <div className="h-6 w-px bg-gray-200 dark:bg-slate-700 mx-1" />
 
                 {/* User avatar dropdown */}
@@ -208,6 +192,6 @@ export default function Header({ onMenuClick, isSidebarCollapsed }: HeaderProps)
                     )}
                 </div>
             </div>
-        </header>
+        </header >
     )
 }

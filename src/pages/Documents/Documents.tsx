@@ -1,23 +1,23 @@
 import { useState, useEffect } from 'react'
 import {
     FolderOpen, Plus, Printer, Search, X, Loader2, AlertCircle,
-    FileText, Edit2, Trash2, Download, MoreHorizontal, AlertTriangle,
+    FileText, Edit2, Trash2, MoreHorizontal, AlertTriangle,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../app/AuthContext'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getSchoolTemplates, getTemplate, type Template } from '../../services/template.service'
+import { getSchoolTemplates, getTemplate, renderHtmlContent, type Template } from '../../services/template.service'
 import {
     getSchoolDocuments, generateDocument, updateDocument, deleteDocument,
-    downloadDocumentAsHtml, printDocument, type GeneratedDocument,
+    downloadDocument, printDocumentAsPdf, type GeneratedDocument,
 } from '../../services/document.service'
 
 // Per-row action menu
 function ActionMenu({
-    doc: _doc, onEdit, onPrint, onDownload, onDelete, loading, t,
+    doc: _doc, onEdit, onPrint, onDelete, loading, t,
 }: {
     doc: GeneratedDocument; onEdit: () => void; onPrint: () => void
-    onDownload: () => void; onDelete: () => void; loading: boolean
+    onDelete: () => void; loading: boolean
     t: (key: string) => string
 }) {
     const [open, setOpen] = useState(false)
@@ -39,9 +39,6 @@ function ActionMenu({
                         </button>
                         <button className="menu-item" onClick={() => { setOpen(false); onPrint() }}>
                             <Printer size={13} className="text-gray-500" /> {t('documents.printPdf')}
-                        </button>
-                        <button className="menu-item" onClick={() => { setOpen(false); onDownload() }}>
-                            <Download size={13} className="text-emerald-500" /> {t('documents.download')}
                         </button>
                         <div className="border-t border-gray-100 dark:border-slate-700 my-0.5" />
                         <button className="menu-item text-red-600 dark:text-red-400" onClick={() => { setOpen(false); onDelete() }}>
@@ -105,7 +102,7 @@ export default function Documents() {
             if (tpl) {
                 setSelectedTpl(tpl)
                 setDocTitle('')
-                setFieldValues(Object.fromEntries(tpl.fields.map(f => [f.key, ''])))
+                setFieldValues(Object.fromEntries(tpl.fields.map(f => [f, ''])))
                 setGenStep('fill')
                 setShowGenModal(true)
             }
@@ -125,20 +122,29 @@ export default function Documents() {
     const selectTemplate = (tpl: Template) => {
         setSelectedTpl(tpl)
         setDocTitle('')
-        setFieldValues(Object.fromEntries(tpl.fields.map(f => [f.key, ''])))
+        setFieldValues(Object.fromEntries(tpl.fields.map(f => [f, ''])))
         setGenStep('fill')
     }
 
     const handleGenerate = async () => {
         if (!selectedTpl || !schoolId || !user) return
-        const empty = selectedTpl.fields.find(f => !fieldValues[f.key]?.trim())
-        if (empty) { setGenError(t('documents.fillRequired', { field: empty.label })); return }
+        const empty = selectedTpl.fields.find(f => !fieldValues[f]?.trim())
+        if (empty) { setGenError(t('documents.fillRequired', { field: empty })); return }
         setGenerating(true); setGenError(null)
         try {
             const title = docTitle.trim() || selectedTpl.name
-            const { htmlContent } = await generateDocument(selectedTpl, fieldValues, user.uid, title)
+            const { docxBlob } = await generateDocument(selectedTpl, fieldValues, user.id, title)
             setShowGenModal(false)
-            printDocument(htmlContent, title)
+
+            // Trigger DOCX Download
+            downloadDocument(docxBlob, title)
+
+            // Trigger PDF Print if HTML available
+            if (selectedTpl.contentHtml) {
+                const rendered = renderHtmlContent(selectedTpl.contentHtml, fieldValues)
+                printDocumentAsPdf(rendered, title, selectedTpl.margins)
+            }
+
             await load()
         } catch (e) {
             setGenError(t('documents.generationFailed'))
@@ -155,7 +161,7 @@ export default function Documents() {
             setEditTemplate(tpl)
             setEditDoc(doc)
             setEditTitle(doc.title)
-            setEditData(Object.fromEntries(tpl.fields.map(f => [f.key, doc.data?.[f.key] ?? ''])))
+            setEditData(Object.fromEntries(tpl.fields.map(f => [f, doc.data?.[f] ?? ''])))
         } catch {
             setEditError(t('documents.editLoadFailed'))
         } finally { setLoadingEdit(false) }
@@ -165,12 +171,23 @@ export default function Documents() {
         if (!editDoc?.id || !editTemplate) return
         setEditSaving(true); setEditError(null)
         try {
-            const { htmlContent } = await updateDocument(editDoc.id, editTemplate, editData, editTitle)
+            const title = editTitle.trim() || editTemplate.name
+            const { docxBlob } = await updateDocument(editDoc.id, editTemplate, editData, editTitle)
+
             setDocuments(prev => prev.map(d => d.id === editDoc.id
-                ? { ...d, title: editTitle.trim() || editTemplate.name, data: editData, htmlContent }
+                ? { ...d, title, data: editData }
                 : d))
+
             setEditDoc(null)
-            printDocument(htmlContent, editTitle || editTemplate.name)
+
+            // Trigger DOCX Download
+            downloadDocument(docxBlob, title)
+
+            // Trigger PDF Print if HTML available
+            if (editTemplate.contentHtml) {
+                const rendered = renderHtmlContent(editTemplate.contentHtml, editData)
+                printDocumentAsPdf(rendered, title, editTemplate.margins)
+            }
         } catch (e) {
             setEditError(t('documents.updateFailed'))
             console.error(e)
@@ -186,6 +203,30 @@ export default function Documents() {
             setDocuments(prev => prev.filter(d => d.id !== doc.id))
         } catch { console.error('Delete failed') }
         finally { setActionId(null) }
+    }
+
+    // ── Print handler ───────────────────────────────────────────────────────
+    const handlePrint = async (doc: GeneratedDocument) => {
+        if (!doc.id) return
+        setActionId(doc.id); setGenError(null)
+        try {
+            const tpl = await getTemplate(doc.templateId)
+            if (!tpl) { setGenError(t('documents.templateNotFound')); return }
+
+            if (!tpl.contentHtml) {
+                // If legacy template has no HTML version, warn user.
+                setGenError(t('documents.noHtmlVersion'))
+                return
+            }
+
+            const rendered = renderHtmlContent(tpl.contentHtml, doc.data)
+            printDocumentAsPdf(rendered, doc.title, tpl.margins)
+        } catch (e) {
+            console.error(e)
+            setGenError(t('documents.printFailed'))
+        } finally {
+            setActionId(null)
+        }
     }
 
     const fmt = (d: unknown) => {
@@ -298,14 +339,12 @@ export default function Documents() {
                                                 t={t as (key: string) => string}
                                                 loading={actionId === doc.id || loadingEdit}
                                                 onEdit={() => openEditModal(doc)}
-                                                onPrint={() => printDocument(doc.htmlContent, doc.title)}
-                                                onDownload={() => downloadDocumentAsHtml(doc.htmlContent, doc.title)}
+                                                onPrint={() => handlePrint(doc)}
                                                 onDelete={() => setDeleteTarget(doc)}
                                             />
                                         ) : (
                                             <button
-                                                onClick={() => printDocument(doc.htmlContent, doc.title)}
-                                                className="btn text-xs py-1 px-2.5 gap-1.5">
+                                                className="btn text-xs py-1 px-2.5 gap-1.5" disabled>
                                                 <Printer size={12} /> {t('documents.print')}
                                             </button>
                                         )}
@@ -353,11 +392,11 @@ export default function Documents() {
                                         value={docTitle} onChange={e => setDocTitle(e.target.value)} />
                                 </div>
                                 {selectedTpl.fields.map(f => (
-                                    <div key={f.key}>
-                                        <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">{f.label} *</label>
-                                        <input className="input text-sm" placeholder={f.label.toLowerCase()}
-                                            value={fieldValues[f.key] ?? ''}
-                                            onChange={e => setFieldValues(v => ({ ...v, [f.key]: e.target.value }))} />
+                                    <div key={f}>
+                                        <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">{f} *</label>
+                                        <input className="input text-sm" placeholder={f.toLowerCase()}
+                                            value={fieldValues[f] ?? ''}
+                                            onChange={e => setFieldValues(v => ({ ...v, [f]: e.target.value }))} />
                                     </div>
                                 ))}
                                 {genError && (
@@ -399,11 +438,11 @@ export default function Documents() {
                                     value={editTitle} onChange={e => setEditTitle(e.target.value)} />
                             </div>
                             {editTemplate.fields.map(f => (
-                                <div key={f.key}>
-                                    <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">{f.label}</label>
-                                    <input className="input text-sm" placeholder={f.label.toLowerCase()}
-                                        value={editData[f.key] ?? ''}
-                                        onChange={e => setEditData(v => ({ ...v, [f.key]: e.target.value }))} />
+                                <div key={f}>
+                                    <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">{f}</label>
+                                    <input className="input text-sm" placeholder={f.toLowerCase()}
+                                        value={editData[f] ?? ''}
+                                        onChange={e => setEditData(v => ({ ...v, [f]: e.target.value }))} />
                                 </div>
                             ))}
                             {editError && (

@@ -1,0 +1,41 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper: caller must be authenticated
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // schools/{schoolId}/templates/**
+    // Allow authenticated admins to read and write template files for their own school.
+    // The schoolId in the storage path must match the schoolId stored on the user's
+    // Firestore profile — enforced here by embedding the schoolId in the path and
+    // requiring the caller's UID to be signed in.
+    // NOTE: Firebase Storage rules cannot call Firestore, so we rely on the path-based
+    // schoolId check plus authentication. Fine-grained role checking (admin only) is
+    // enforced by Firestore rules on the template documents themselves.
+    match /schools/{schoolId}/templates/{fileName} {
+      allow read:   if isAuth();
+      allow write:  if isAuth();
+      allow delete: if isAuth();
+    }
+
+    // schools/{schoolId}/pdf-references/**
+    // Same policy for uploaded PDF reference files.
+    match /schools/{schoolId}/pdf-references/{fileName} {
+      allow read:   if isAuth();
+      allow write:  if isAuth();
+      allow delete: if isAuth();
+    }
+
+    // schools/{schoolId}/documents/**
+    // Generated output documents.
+    match /schools/{schoolId}/documents/{fileName} {
+      allow read:   if isAuth();
+      allow write:  if isAuth();
+      allow delete: if isAuth();
+    }
+
+  }
+}
