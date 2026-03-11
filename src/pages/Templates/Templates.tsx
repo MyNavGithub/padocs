@@ -486,9 +486,10 @@ function TemplateEditor({ onCancel, onSaved }: { onCancel: () => void, onSaved: 
     useEffect(() => {
         if (!showPreview || !docxBuffer || !previewRef.current) return
         import('docx-preview').then(({ renderAsync }) => {
+            if (!previewRef.current) return
             renderAsync(
                 new Blob([docxBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }),
-                previewRef.current!,
+                previewRef.current,
                 undefined,
                 { className: 'docx-preview-content', inWrapper: true }
             ).catch(console.warn)
@@ -704,7 +705,8 @@ function TemplatePreviewModal({ tpl, onClose }: { tpl: Template; onClose: () => 
         getTemplate(tpl.id!, true).then(fullTpl => {
             if (fullTpl?.content) {
                 import('docx-preview').then(({ renderAsync }) => {
-                    renderAsync(fullTpl.content, previewRef.current!, undefined, {
+                    if (!previewRef.current) return
+                    renderAsync(fullTpl.content, previewRef.current, undefined, {
                         inWrapper: false,
                         ignoreWidth: false,
                         ignoreHeight: false,

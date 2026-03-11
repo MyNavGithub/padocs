@@ -124,7 +124,7 @@ export async function fetchUserSchoolAndRole(uid: string): Promise<UserSchoolInf
         for (let attempt = 1; attempt <= 5; attempt++) {
             const { data, error } = await supabase
                 .from('users')
-                .select('*')
+                .select('id, school_id, email, role, is_active')
                 .eq('id', uid)
                 .single()
 

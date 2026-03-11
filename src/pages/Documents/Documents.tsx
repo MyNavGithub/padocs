@@ -84,7 +84,8 @@ function DocumentGenerator({
   useEffect(() => {
     if (step !== 'preview' || !filledBlob || !previewRef.current) return
     import('docx-preview').then(({ renderAsync }) => {
-      renderAsync(filledBlob, previewRef.current!, undefined, {
+      if (!previewRef.current) return
+      renderAsync(filledBlob, previewRef.current, undefined, {
         className: 'docx-preview-content',
         inWrapper: false,
         ignoreWidth: false,
@@ -325,7 +326,8 @@ function DocumentPreviewModal({ doc, onClose }: { doc: StoredDocument; onClose: 
       .then(res => res.blob())
       .then(blob => {
         import('docx-preview').then(({ renderAsync }) => {
-          renderAsync(blob, previewRef.current!, undefined, {
+          if (!previewRef.current) return
+          renderAsync(blob, previewRef.current, undefined, {
             className: 'docx-preview-content',
             inWrapper: false,
             ignoreWidth: false,
