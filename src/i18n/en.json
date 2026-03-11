@@ -4,7 +4,11 @@
     "templates": "Templates",
     "documents": "Generated Documents",
     "settings": "Settings",
-    "teachers": "Teachers"
+    "teachers": "Teachers",
+    "mainNav": "Main navigation",
+    "closeSidebar": "Close sidebar",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar"
   },
   "header": {
     "notifications": "Notifications",

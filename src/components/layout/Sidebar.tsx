@@ -53,7 +53,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
             {/* Sidebar panel */}
             <aside
                 role="navigation"
-                aria-label="Main navigation"
+                aria-label={t('nav.mainNav')}
                 className={[
                     'fixed top-0 left-0 z-40 h-full flex flex-col',
                     'bg-white border-r border-gray-200',
@@ -83,7 +83,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
                     )}
 
                     {/* Close button (mobile) */}
-                    <button className="icon-btn lg:hidden ml-auto" onClick={onClose} aria-label="Close sidebar">
+                    <button className="icon-btn lg:hidden ml-auto" onClick={onClose} aria-label={t('nav.closeSidebar')}>
                         <X size={16} />
                     </button>
 
@@ -91,7 +91,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
                     <button
                         className="icon-btn hidden lg:flex"
                         onClick={onToggleCollapse}
-                        aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                        aria-label={isCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
                     >
                         {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
                     </button>

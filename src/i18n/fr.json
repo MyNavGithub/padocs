@@ -4,7 +4,11 @@
     "templates": "Modèles",
     "documents": "Documents générés",
     "settings": "Paramètres",
-    "teachers": "Enseignants"
+    "teachers": "Enseignants",
+    "mainNav": "Navigation principale",
+    "closeSidebar": "Fermer la barre latérale",
+    "expandSidebar": "Développer la barre latérale",
+    "collapseSidebar": "Réduire la barre latérale"
   },
   "header": {
     "notifications": "Notifications",
