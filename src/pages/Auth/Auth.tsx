@@ -186,7 +186,7 @@ export default function Auth() {
                                 id="email"
                                 type="email"
                                 className="input pl-9"
-                                placeholder="vous@example.com"
+                                placeholder={t('auth.emailPlaceholder')}
                                 value={form.email}
                                 onChange={setField('email')}
                                 autoComplete="email"
@@ -225,7 +225,7 @@ export default function Auth() {
                                 type="button"
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                                 onClick={() => setShowPassword(v => !v)}
-                                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                                 tabIndex={-1}
                             >
                                 {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}

@@ -129,7 +129,7 @@ export default function Dashboard() {
                         <div className="card p-5">
                             <h2 className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-3">{t('dashboard.quickActions')}</h2>
                             <div className="space-y-2">
-                                <button onClick={() => navigate('/editor')}
+                                <button onClick={() => navigate('/templates?new=true')}
                                     className="w-full flex items-center justify-between p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors group">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
@@ -170,13 +170,17 @@ export default function Dashboard() {
                                 <div className="space-y-2">
                                     {documents.slice(0, 4).map(doc => (
                                         <div key={doc.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 dark:border-slate-800 last:border-0">
-                                            <div>
-                                                <p className="text-xs font-medium text-gray-700 dark:text-slate-300 truncate max-w-[180px]">{doc.title}</p>
-                                                <p className="text-xs text-gray-400">{doc.templateName}</p>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold text-gray-900 dark:text-white truncate" title={doc.title}>
+                                                    {doc.title || doc.templateName}
+                                                </p>
+                                                <p className="text-[10px] text-gray-400 truncate">{doc.templateName}</p>
                                             </div>
-                                            <button onClick={() => { /* regenerate or download if URL? */ }} className="icon-btn" title="Download" disabled>
-                                                <Printer size={13} />
-                                            </button>
+                                            <div className="flex items-center gap-1.5 ml-2">
+                                                <button className="w-7 h-7 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-400 flex items-center justify-center cursor-not-allowed" title={t('common.download')}>
+                                                    <Printer size={12} />
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

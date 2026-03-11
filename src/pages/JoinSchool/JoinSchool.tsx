@@ -173,7 +173,7 @@ export default function JoinSchool() {
                                     <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                     <input id="email" type="email"
                                         className="input pl-9"
-                                        placeholder="enseignant@ecole.com"
+                                        placeholder={t('join.emailPlaceholder')}
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         required

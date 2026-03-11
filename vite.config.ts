@@ -59,13 +59,7 @@ export default defineConfig({
         manualChunks: {
           'supabase-vendor': ['@supabase/supabase-js'],
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'tiptap-vendor': [
-            '@tiptap/react', '@tiptap/starter-kit',
-            '@tiptap/extension-underline', '@tiptap/extension-text-align',
-            '@tiptap/extension-text-style', '@tiptap/extension-color',
-            '@tiptap/extension-table', '@tiptap/extension-table-row',
-            '@tiptap/extension-table-header', '@tiptap/extension-table-cell',
-          ],
+          'docx-vendor': ['docxtemplater', 'pizzip', 'docx-preview', 'jszip'],
           'mammoth-vendor': ['mammoth'],
         },
       },

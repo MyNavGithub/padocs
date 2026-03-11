@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import { useLocalStorage } from '../../hooks/useLocalStorage'
@@ -7,8 +7,7 @@ import { useLocalStorage } from '../../hooks/useLocalStorage'
 export default function Layout() {
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage('padocs-sidebar-collapsed', false)
-    const location = useLocation()
-    const isEditorPage = location.pathname.startsWith('/editor')
+
 
     return (
         // h-screen + overflow-hidden locks the viewport — no browser-level scroll
@@ -37,21 +36,11 @@ export default function Layout() {
                 {/* Page content — sits below fixed header (pt-14), fills remaining height */}
                 <main
                     id="main-content"
-                    className={[
-                        'flex-1 pt-14 min-h-0',
-                        isEditorPage
-                            ? 'overflow-hidden flex flex-col'
-                            : 'overflow-auto',
-                    ].join(' ')}
+                    className="flex-1 pt-14 min-h-0 overflow-auto"
                 >
-                    {isEditorPage ? (
-                        /* Editor fills full remaining height — no padding/max-width */
+                    <div className="p-4 md:p-6 max-w-[1400px] mx-auto w-full">
                         <Outlet />
-                    ) : (
-                        <div className="p-4 md:p-6 max-w-[1400px] mx-auto w-full">
-                            <Outlet />
-                        </div>
-                    )}
+                    </div>
                 </main>
             </div>
         </div>

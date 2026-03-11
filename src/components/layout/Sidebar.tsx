@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
     LayoutDashboard, FileText, FolderOpen, Settings,
-    ChevronLeft, ChevronRight, X, FileEdit, Users,
+    ChevronLeft, ChevronRight, X, Users,
 } from 'lucide-react'
 import { useAuth } from '../../app/AuthContext'
 
@@ -26,12 +26,11 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
     const { user, role, schoolName } = useAuth()
 
     const navItems: NavItem[] = [
-        { label: t('nav.dashboard'),  path: '/dashboard',  icon: <LayoutDashboard size={18} /> },
-        { label: t('nav.templates'),  path: '/templates',  icon: <FileText size={18} /> },
-        { label: t('nav.editor'),     path: '/editor',     icon: <FileEdit size={18} />, adminOnly: true },
-        { label: t('nav.documents'),  path: '/documents',  icon: <FolderOpen size={18} /> },
-        { label: t('nav.teachers'),   path: '/teachers',   icon: <Users size={18} />, adminOnly: true },
-        { label: t('nav.settings'),   path: '/settings',   icon: <Settings size={18} /> },
+        { label: t('nav.dashboard'), path: '/dashboard', icon: <LayoutDashboard size={18} /> },
+        { label: t('nav.templates'), path: '/templates', icon: <FileText size={18} /> },
+        { label: t('nav.documents'), path: '/documents', icon: <FolderOpen size={18} /> },
+        { label: t('nav.teachers'), path: '/teachers', icon: <Users size={18} />, adminOnly: true },
+        { label: t('nav.settings'), path: '/settings', icon: <Settings size={18} /> },
     ]
 
     // Filter admin-only items for non-admins

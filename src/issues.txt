@@ -1,0 +1,8 @@
+c:\Users\japh\.gemini\antigravity\scratch\padocs\src\pages\Templates\Templates.tsx:88 => placeholder="Human-readable label"
+c:\Users\japh\.gemini\antigravity\scratch\padocs\src\pages\Templates\Templates.tsx:128 => placeholder="Optional default"
+c:\Users\japh\.gemini\antigravity\scratch\padocs\src\pages\Templates\Templates.tsx:138 => placeholder="Option 1, Option 2, Option 3"
+c:\Users\japh\.gemini\antigravity\scratch\padocs\src\pages\Templates\Templates.tsx:269 => placeholder="Paste or type text to find"
+c:\Users\japh\.gemini\antigravity\scratch\padocs\src\pages\Templates\Templates.tsx:641 => <textarea className="input" rows={2} placeholder="What is this template for?" value={description} onChange={e => setDescription(e.target.value)} />
+c:\Users\japh\.gemini\antigravity\scratch\padocs\src\pages\Templates\Templates.tsx:661 => placeholder="Add custom field name..."
+c:\Users\japh\.gemini\antigravity\scratch\padocs\src\components\layout\Sidebar.tsx:56 => aria-label="Main navigation"
+c:\Users\japh\.gemini\antigravity\scratch\padocs\src\components\layout\Sidebar.tsx:86 => <button className="icon-btn lg:hidden ml-auto" onClick={onClose} aria-label="Close sidebar">

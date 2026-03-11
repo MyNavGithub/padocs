@@ -102,12 +102,9 @@ export default function Teachers() {
 
             // WORKAROUND: Send email directly via the user's native email client (Zero Backend / Free)
             const activationUrl = `${window.location.origin}/teacher-activate?token=${token}`
-            const subject = encodeURIComponent(`Invitation à rejoindre ${schoolName} sur PADocs`)
+            const subject = encodeURIComponent(`${t('teachers.invitePrefix')} ${schoolName} sur PADocs`)
             const body = encodeURIComponent(
-                `Bonjour,\n\nVous avez été invité(e) en tant que professeur à ${schoolName} sur la plateforme PADocs.\n\n` +
-                `Veuillez cliquer sur le lien ci-dessous pour activer votre compte :\n${activationUrl}\n\n` +
-                `Le lien expire dans 72 heures.\n\n` +
-                `Si vous n'attendiez pas d'invitation, vous pouvez simplement ignorer cet e-mail.\n\nCordialement,\nL'équipe PADocs`
+                `${t('teachers.inviteBody1')} ${schoolName} ${t('teachers.inviteBody2')}${activationUrl}${t('teachers.inviteBody3')}`
             )
             window.location.href = `mailto:${teacher.email}?subject=${subject}&body=${body}`
 

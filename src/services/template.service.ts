@@ -135,32 +135,24 @@ export async function getSchoolTemplates(schoolId: string): Promise<Template[]> 
         .from('templates')
         .select('*')
         .eq('school_id', schoolId)
+        .order('created_at', { ascending: false })
 
     if (error) throw error
 
-    const templates: Template[] = []
-    for (const d of data) {
-        let content: ArrayBuffer = new ArrayBuffer(0)
-        try {
-            content = await downloadTemplateDocx(d.school_id, d.id)
-        } catch { /* empty */ }
-
-        templates.push({
-            id: d.id,
-            schoolId: d.school_id,
-            name: d.name,
-            fields: d.fields,
-            pdfReferenceUrl: d.pdf_reference_url,
-            isActive: d.is_active,
-            createdAt: d.created_at,
-            contentHtml: d.content_html ?? undefined,
-            content
-        } as Template)
-    }
-    return templates
+    return data.map(d => ({
+        id: d.id,
+        schoolId: d.school_id,
+        name: d.name,
+        fields: d.fields,
+        pdfReferenceUrl: d.pdf_reference_url,
+        isActive: d.is_active,
+        createdAt: d.created_at,
+        contentHtml: d.content_html ?? undefined,
+        content: new ArrayBuffer(0) // Don't download binary for list view
+    } as Template))
 }
 
-export async function getTemplate(id: string): Promise<Template | null> {
+export async function getTemplate(id: string, includeContent: boolean = true): Promise<Template | null> {
     const { data, error } = await supabase
         .from('templates')
         .select('*')
@@ -170,9 +162,13 @@ export async function getTemplate(id: string): Promise<Template | null> {
     if (error || !data) return null
 
     let content: ArrayBuffer = new ArrayBuffer(0)
-    try {
-        content = await downloadTemplateDocx(data.school_id, data.id)
-    } catch { /* empty */ }
+    if (includeContent) {
+        try {
+            content = await downloadTemplateDocx(data.school_id, data.id)
+        } catch (e) {
+            console.warn('Failed to download template content:', e)
+        }
+    }
 
     return {
         id: data.id,

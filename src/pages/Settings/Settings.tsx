@@ -86,9 +86,9 @@ export default function SettingsPage() {
             <div className="card p-6">
                 <div className="flex items-center gap-2 mb-5">
                     <CreditCard size={18} className="text-gray-500 dark:text-slate-400" />
-                    <h2 className="font-semibold text-gray-800 dark:text-slate-200">Billing & Plan</h2>
+                    <h2 className="font-semibold text-gray-800 dark:text-slate-200">{t('settings.billingAndPlan')}</h2>
                     <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">
-                        Coming Soon
+                        {t('common.comingSoon')}
                     </span>
                 </div>
 
@@ -121,8 +121,8 @@ export default function SettingsPage() {
                                 {p.id === currentPlan.id && <Check size={14} className="text-indigo-600 dark:text-indigo-400" />}
                             </div>
                             <p className="text-lg font-bold text-gray-900 dark:text-white mb-3">
-                                {p.price === 0 ? 'Gratuit' : `${p.price.toLocaleString()} XOF`}
-                                {p.price > 0 && <span className="text-xs font-normal text-gray-400">/mois</span>}
+                                {p.price === 0 ? t('settings.free') : `${p.price.toLocaleString()} XOF`}
+                                {p.price > 0 && <span className="text-xs font-normal text-gray-400">/{t('settings.perMonth')}</span>}
                             </p>
                             <ul className="space-y-1">
                                 {p.features.map((f, i) => (

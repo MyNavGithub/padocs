@@ -14,6 +14,7 @@ i18n
         },
         fallbackLng: 'fr',
         supportedLngs: ['en', 'fr'],
+        lng: typeof window !== 'undefined' ? (localStorage.getItem('i18nextLng') || 'fr') : 'fr',
         detection: {
             order: ['localStorage', 'navigator'],
             caches: ['localStorage'],

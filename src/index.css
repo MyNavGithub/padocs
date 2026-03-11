@@ -868,3 +868,24 @@
 .dark .menu-item:hover {
   background-color: #334155;
 }
+
+/* docx-preview styles */
+.docx-preview-content section.docx {
+  padding: 0px !important;
+  background: white;
+  box-shadow: none !important;
+  margin: 0px auto !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+.a4-container {
+  width: 794px;
+  min-height: 1123px;
+  background: white !important;
+  margin: 0 auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden;
+}

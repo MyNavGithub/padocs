@@ -54,7 +54,7 @@ export default function Landing() {
             {/* Hero */}
             <section className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16 max-w-4xl mx-auto w-full">
                 <div className="badge badge-primary mb-6">
-                    ✦ {i18n.language?.startsWith('fr') ? 'Nouveau' : 'New'} v1.0
+                    ✦ {t('landing.newbadge')} v1.0
                 </div>
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white leading-tight mb-6">
                     {t('landing.hero').split('\n').map((line, i) => (
@@ -78,10 +78,10 @@ export default function Landing() {
 
                 {/* Trust badges */}
                 <div className="flex flex-wrap items-center justify-center gap-4 mt-10 text-sm text-gray-400">
-                    {['PWA Ready', 'Bilingual FR/EN', 'WCAG AA', 'Offline Support'].map(t => (
-                        <span key={t} className="flex items-center gap-1">
+                    {[t('landing.pwa'), t('landing.bilingual'), t('landing.wcag'), t('landing.offline')].map(tx => (
+                        <span key={tx} className="flex items-center gap-1">
                             <CheckCircle size={14} className="text-emerald-500" />
-                            {t}
+                            {tx}
                         </span>
                     ))}
                 </div>
@@ -91,7 +91,7 @@ export default function Landing() {
             <section className="py-16 px-6 bg-gray-50 dark:bg-slate-900">
                 <div className="max-w-5xl mx-auto">
                     <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-white mb-10">
-                        {i18n.language?.startsWith('fr') ? 'Fonctionnalités clés' : 'Key Features'}
+                        {t('landing.keyFeatures')}
                     </h2>
                     <div className="grid sm:grid-cols-3 gap-6">
                         {features.map((f) => (
@@ -123,7 +123,7 @@ export default function Landing() {
 
             {/* Footer */}
             <footer className="py-6 px-6 border-t border-gray-100 dark:border-slate-800 text-center text-xs text-gray-400">
-                © 2025 PADocs – Plateforme d'Automatisation des Documents
+                {t('landing.footer')}
             </footer>
         </div>
     )
